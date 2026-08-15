@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cyber Bloom Hand & Smile Tracking</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #000;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    #canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    #webcam {
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #00f0ff;
+      text-align: center;
+      padding: 24px;
+      background: rgba(10, 10, 15, 0.95);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      border-radius: 8px;
+      z-index: 100;
+      max-width: 320px;
+    }
+    #btn-start {
+      margin-top: 15px;
+      padding: 12px 24px;
+      background: #ff2b6d;
+      border: none;
+      color: #fff;
+      font-weight: bold;
+      font-size: 1rem;
+      border-radius: 4px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    #btn-start:hover {
+      background: #ff5588;
+    }
+    #btn-start:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #btn-stop {
+      margin-top: 10px;
+      padding: 8px 18px;
+      background: transparent;
+      border: 1px solid rgba(0, 240, 255, 0.5);
+      color: #00f0ff;
+      font-size: 0.85rem;
+      border-radius: 4px;
+      font-family: inherit;
+      cursor: pointer;
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 100;
+      display: none;
+    }
+    #tutorial-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #00f0ff;
+      text-align: center;
+      padding: 28px 24px;
+      background: rgba(10, 10, 15, 0.95);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      border-radius: 8px;
+      z-index: 110;
+      max-width: 340px;
+      display: none;
+    }
+    .tutorial-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #fff;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+    .tutorial-list {
+      list-style: none;
+      text-align: left;
+      color: #00f0ff;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+    .tutorial-list li {
+      margin-bottom: 8px;
+    }
+    .tutorial-btn {
+      padding: 12px 24px;
+      background: #ff2b6d;
+      border: none;
+      color: #fff;
+      font-weight: bold;
+      font-size: 1rem;
+      border-radius: 4px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .tutorial-btn:hover {
+      background: #ff5588;
+    }
+  </style>
+
+  <!-- MediaPipe CDN Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="stage">
+    <div id="overlay">
+      <p id="status-text">Click to start tracking</p>
+      <button id="btn-start" onclick="initApp()">Start Webcam</button>
+    </div>
+    <button id="btn-stop" onclick="stopApp()">Stop Camera</button>
+
+    <div id="tutorial-overlay">
+      <div id="tutorial-content"></div>
+    </div>
+
+    <video id="webcam" playsinline autoplay muted></video>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const statusText = document.getElementById('status-text');
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const tutorialOverlay = document.getElementById('tutorial-overlay');
+    const tutorialContent = document.getElementById('tutorial-content');
+
+    let tutorialShown = false;
+
+    function showWelcomeAndTutorial() {
+      return new Promise((resolve) => {
+        const screens = [
+          `<p class="tutorial-title">🌸 Snehanshu presents you some Flowers 🌸</p>
+           <button class="tutorial-btn" id="tutorial-next">Continue</button>`,
+          `<p class="tutorial-title">How it works</p>
+           <ul class="tutorial-list">
+             <li>🤏 Pinch your thumb and index finger together to bloom flowers from your fingertips</li>
+             <li>✊ Make a fist to close the flowers</li>
+             <li>👉 Point at an icon in the top bar and pinch to switch the flower type</li>
+             <li>😊 Smile at the camera for a little surprise</li>
+           </ul>
+           <button class="tutorial-btn" id="tutorial-start">Start Blooming</button>`
+        ];
+
+        let idx = 0;
+
+        function paint() {
+          tutorialContent.innerHTML = screens[idx];
+          const btn = tutorialContent.querySelector('button');
+          btn.addEventListener('click', () => {
+            idx++;
+            if (idx < screens.length) {
+              paint();
+            } else {
+              tutorialOverlay.style.display = 'none';
+              resolve();
+            }
+          });
+        }
+
+        tutorialOverlay.style.display = 'block';
+        paint();
+      });
+    }
+
+    if (!ctx.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+        if (typeof r === 'number') r = { tl: r, tr: r, br: r, bl: r };
+        this.beginPath();
+        this.moveTo(x + r.tl, y);
+        this.lineTo(x + w - r.tr, y);
+        this.arcTo(x + w, y, x + w, y + r.tr, r.tr);
+        this.lineTo(x + w, y + h - r.br);
+        this.arcTo(x + w, y + h, x + w - r.br, y + h, r.br);
+        this.lineTo(x + r.bl, y + h);
+        this.arcTo(x, y + h, x, y + h - r.bl, r.bl);
+        this.lineTo(x, y + r.tl);
+        this.arcTo(x, y, x + r.tl, y, r.tl);
+        this.closePath();
+        return this;
+      };
+    }
+
+    const FINGERTIPS = [4, 8, 12, 16, 20];
+    const FINGER_MCP = [2, 5, 9, 13, 17];
+
+    const CONFIG = {
+      smoothingRate: 0.22,
+      smileSmoothingRate: 0.18,
+      smileRatioMin: 0.38,
+      smileRatioMax: 0.48,
+      fistTipRatioThreshold: 1.25,
+      pinchRatioMin: 0.32,
+      pinchRatioMax: 1.30,
+      airTapPinchFactor: 0.35,
+      airTapCooldownMs: 400
+    };
+
+    const FLOWER_TYPES = [
+      { name: 'Rose', emoji: '🌹', petals: 6, primaryColor: 'rgba(255, 30, 80, 0.95)', midColor: 'rgba(255, 70, 120, 0.7)', glow: '#ff1e50', pistil: '#fff4f8' },
+      { name: 'Lotus', emoji: '🪷', petals: 8, primaryColor: 'rgba(255, 100, 200, 0.95)', midColor: 'rgba(200, 50, 255, 0.7)', glow: '#ff64c8', pistil: '#ffeb3b' },
+      { name: 'Daisy', emoji: '🌼', petals: 12, primaryColor: 'rgba(255, 255, 255, 0.95)', midColor: 'rgba(255, 230, 150, 0.7)', glow: '#ffe600', pistil: '#ffaa00' },
+      { name: 'Sakura', emoji: '🌸', petals: 5, primaryColor: 'rgba(255, 170, 200, 0.95)', midColor: 'rgba(255, 120, 160, 0.7)', glow: '#ffaac8', pistil: '#ffffff' }
+    ];
+
+    let currentFlowerIdx = 0;
+    let smoothSmile = 0;
+    let lastTapTime = 0;
+
+    const handState = [
+      { smoothBloom: 0, smoothGrow: 0 },
+      { smoothBloom: 0, smoothGrow: 0 }
+    ];
+
+    let latestHandResults = null;
+    let latestFaceResults = null;
+    let mediaStream = null;
+    let appRunning = false;
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function dist(p1, p2) {
+      return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+    }
+
+    function drawFlower(x, y, maxRadius, bloomProgress, flowerConfig, time) {
+      if (bloomProgress <= 0.05) return;
+
+      const numPetals = flowerConfig.petals;
+      const baseRadius = maxRadius * bloomProgress;
+
+      ctx.save();
+      ctx.translate(x, y);
+
+      for (let i = 0; i < numPetals; i++) {
+        const angle = (i * (Math.PI * 2)) / numPetals + Math.sin(time * 0.003 + i) * 0.08;
+        const petalLen = baseRadius * 1.5;
+        const petalWidth = baseRadius * (numPetals > 8 ? 0.35 : 0.55);
+
+        ctx.save();
+        ctx.rotate(angle);
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.bezierCurveTo(-petalWidth, petalLen * 0.4, -petalWidth * 0.8, petalLen, 0, petalLen * 1.2);
+        ctx.bezierCurveTo(petalWidth * 0.8, petalLen, petalWidth, petalLen * 0.4, 0, 0);
+
+        const grad = ctx.createLinearGradient(0, 0, 0, petalLen);
+        grad.addColorStop(0, flowerConfig.primaryColor);
+        grad.addColorStop(0.6, flowerConfig.midColor);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0.15)');
+
+        ctx.fillStyle = grad;
+        ctx.shadowColor = flowerConfig.glow;
+        ctx.shadowBlur = 15;
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius * 0.25, 0, Math.PI * 2);
+      ctx.fillStyle = flowerConfig.pistil;
+      ctx.shadowColor = flowerConfig.glow;
+      ctx.shadowBlur = 20;
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function render() {
+      const w = canvas.width;
+      const h = canvas.height;
+      const time = performance.now();
+
+      if (video.readyState >= 2) {
+        ctx.save();
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, w, h);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
+        const facePts = latestFaceResults.multiFaceLandmarks[0].map(p => ({ x: (1 - p.x) * w, y: p.y * h }));
+
+        const mouthWidth = dist(facePts[61], facePts[291]);
+        const faceWidth = dist(facePts[234], facePts[454]);
+        const smileRatio = mouthWidth / (faceWidth || 1);
+
+        let targetSmile = (smileRatio - CONFIG.smileRatioMin) / (CONFIG.smileRatioMax - CONFIG.smileRatioMin);
+        targetSmile = Math.max(0, Math.min(1, targetSmile));
+
+        smoothSmile += (targetSmile - smoothSmile) * CONFIG.smileSmoothingRate;
+      } else {
+        smoothSmile += (0 - smoothSmile) * CONFIG.smileSmoothingRate;
+      }
+
+      const buttonWidth = 70;
+      const buttonHeight = 70;
+      const buttonY = 50;
+      const totalBarWidth = FLOWER_TYPES.length * (buttonWidth + 15);
+      const startX = (w - totalBarWidth) / 2;
+
+      const buttons = FLOWER_TYPES.map((flower, idx) => ({
+        idx,
+        flower,
+        x: startX + idx * (buttonWidth + 15),
+        y: buttonY,
+        w: buttonWidth,
+        h: buttonHeight,
+        hovered: false
+      }));
+
+      let primaryPalmX = w / 2;
+      let primaryWristY = h / 2;
+
+      if (latestHandResults && latestHandResults.multiHandLandmarks && latestHandResults.multiHandLandmarks.length > 0) {
+        latestHandResults.multiHandLandmarks.forEach((landmarks, handIdx) => {
+          const state = handState[handIdx] || (handState[handIdx] = { smoothBloom: 0, smoothGrow: 0 });
+
+          const pts = landmarks.map(p => ({ x: (1 - p.x) * w, y: p.y * h }));
+          const wrist = pts[0];
+          const thumbTip = pts[4];
+          const indexTip = pts[8];
+          const middleMcp = pts[9];
+
+          primaryPalmX = (wrist.x + middleMcp.x) / 2;
+          primaryWristY = wrist.y;
+
+          const palmHeight = Math.max(15, dist(wrist, middleMcp));
+
+          const pinchDist = dist(thumbTip, indexTip);
+          const isAirTapping = pinchDist < palmHeight * CONFIG.airTapPinchFactor;
+
+          let isHoveringTopBar = false;
+
+          buttons.forEach((btn) => {
+            const isHovered = (
+              indexTip.x >= btn.x &&
+              indexTip.x <= btn.x + btn.w &&
+              indexTip.y >= btn.y &&
+              indexTip.y <= btn.y + btn.h
+            );
+
+            if (isHovered) {
+              isHoveringTopBar = true;
+              btn.hovered = true;
+
+              if (isAirTapping && time - lastTapTime > CONFIG.airTapCooldownMs) {
+                currentFlowerIdx = btn.idx;
+                lastTapTime = time;
+              }
+            }
+          });
+
+          let totalTipDist = 0;
+          FINGERTIPS.forEach(tipIdx => {
+            totalTipDist += dist(wrist, pts[tipIdx]) / palmHeight;
+          });
+          const avgTipRatio = totalTipDist / FINGERTIPS.length;
+          const isFist = avgTipRatio < CONFIG.fistTipRatioThreshold;
+
+          let targetBloom = 0;
+          let targetGrow = 0;
+
+          if (!isFist && !isHoveringTopBar) {
+            const pinchRatio = pinchDist / palmHeight;
+            targetBloom = (pinchRatio - CONFIG.pinchRatioMin) / (CONFIG.pinchRatioMax - CONFIG.pinchRatioMin);
+            targetBloom = Math.max(0, Math.min(1, targetBloom));
+            targetGrow = Math.max(0.1, targetBloom);
+          }
+
+          state.smoothBloom += (targetBloom - state.smoothBloom) * CONFIG.smoothingRate;
+          state.smoothGrow += (targetGrow - state.smoothGrow) * CONFIG.smoothingRate;
+
+          const activeFlower = FLOWER_TYPES[currentFlowerIdx];
+
+          if (state.smoothGrow > 0.05) {
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 240, 255, 0.9)';
+            ctx.shadowBlur = 14;
+            ctx.lineWidth = 3;
+
+            FINGERTIPS.forEach((tipIdx, i) => {
+              const tip = pts[tipIdx];
+              const mcp = pts[FINGER_MCP[i]];
+
+              const targetX = wrist.x + (tip.x - wrist.x) * state.smoothGrow;
+              const targetY = wrist.y + (tip.y - wrist.y) * state.smoothGrow;
+
+              ctx.beginPath();
+              ctx.moveTo(wrist.x, wrist.y);
+              const ctrlX = (wrist.x + mcp.x) / 2 + Math.sin(time * 0.002 + i) * 12;
+              const ctrlY = (wrist.y + mcp.y) / 2;
+
+              ctx.quadraticCurveTo(ctrlX, ctrlY, targetX, targetY);
+
+              const vineGrad = ctx.createLinearGradient(wrist.x, wrist.y, targetX, targetY);
+              vineGrad.addColorStop(0, 'rgba(0, 180, 255, 0.15)');
+              vineGrad.addColorStop(1, 'rgba(0, 255, 230, 0.95)');
+              ctx.strokeStyle = vineGrad;
+              ctx.stroke();
+            });
+            ctx.restore();
+          }
+
+          if (state.smoothBloom > 0.05) {
+            const flowerMaxSize = palmHeight * 0.5;
+            FINGERTIPS.forEach((tipIdx) => {
+              const tip = pts[tipIdx];
+              const currentHeadX = wrist.x + (tip.x - wrist.x) * state.smoothGrow;
+              const currentHeadY = wrist.y + (tip.y - wrist.y) * state.smoothGrow;
+
+              drawFlower(currentHeadX, currentHeadY, flowerMaxSize, state.smoothBloom, activeFlower, time);
+            });
+          }
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(indexTip.x, indexTip.y, isAirTapping ? 12 : 8, 0, Math.PI * 2);
+          ctx.fillStyle = isAirTapping ? '#ff2b6d' : '#00f0ff';
+          ctx.shadowColor = isAirTapping ? '#ff2b6d' : '#00f0ff';
+          ctx.shadowBlur = 15;
+          ctx.fill();
+          ctx.restore();
+
+          if (state.smoothBloom > 0.2) {
+            ctx.save();
+            ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, state.smoothBloom * 1.2)})`;
+            ctx.shadowColor = activeFlower.glow;
+            ctx.shadowBlur = 18;
+            ctx.font = 'bold 26px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`For you ${activeFlower.emoji}`, primaryPalmX, primaryWristY + 60);
+            ctx.restore();
+          }
+        });
+
+        for (let i = latestHandResults.multiHandLandmarks.length; i < handState.length; i++) {
+          handState[i].smoothBloom += (0 - handState[i].smoothBloom) * CONFIG.smoothingRate;
+          handState[i].smoothGrow += (0 - handState[i].smoothGrow) * CONFIG.smoothingRate;
+        }
+      } else {
+        handState.forEach(state => {
+          state.smoothBloom += (0 - state.smoothBloom) * CONFIG.smoothingRate;
+          state.smoothGrow += (0 - state.smoothGrow) * CONFIG.smoothingRate;
+        });
+      }
+
+      buttons.forEach((btn) => {
+        const isSelected = btn.idx === currentFlowerIdx;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 14);
+
+        if (isSelected) {
+          ctx.fillStyle = 'rgba(0, 240, 255, 0.25)';
+          ctx.strokeStyle = '#00f0ff';
+          ctx.shadowColor = '#00f0ff';
+          ctx.shadowBlur = 18;
+        } else if (btn.hovered) {
+          ctx.fillStyle = 'rgba(255, 43, 109, 0.25)';
+          ctx.strokeStyle = '#ff2b6d';
+          ctx.shadowColor = '#ff2b6d';
+          ctx.shadowBlur = 12;
+        } else {
+          ctx.fillStyle = 'rgba(15, 15, 25, 0.75)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.shadowBlur = 0;
+        }
+
+        ctx.lineWidth = isSelected || btn.hovered ? 2.5 : 1;
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = isSelected ? '30px "Courier New"' : '24px "Courier New"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(btn.flower.emoji, btn.x + btn.w / 2, btn.y + btn.h / 2);
+        ctx.restore();
+      });
+
+      if (smoothSmile > 0.3) {
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 225, 80, ${Math.min(1, smoothSmile * 1.5)})`;
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 24;
+        ctx.font = 'bold 30px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('happy you smiled ✨', w / 2, h - 70);
+        ctx.restore();
+      }
+
+      if (appRunning) {
+        requestAnimationFrame(render);
+      }
+    }
+
+    let isProcessing = false;
+    let frameCount = 0;
+
+    async function initApp() {
+      try {
+        btnStart.disabled = true;
+        statusText.innerText = "Accessing camera...";
+
+        if (typeof Hands === 'undefined' || typeof FaceMesh === 'undefined') {
+          throw new Error('Tracking models failed to load from CDN. Check your connection or ad blocker and reload.');
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        mediaStream = stream;
+
+        video.srcObject = stream;
+        await video.play();
+
+        statusText.innerText = "Loading AI models...";
+
+        const hands = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        hands.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
+        hands.onResults((results) => { latestHandResults = results; });
+
+        const faceMesh = new FaceMesh({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+        });
+        faceMesh.setOptions({
+          maxNumFaces: 1,
+          refineLandmarks: true,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
+        faceMesh.onResults((results) => { latestFaceResults = results; });
+
+        appRunning = true;
+
+        async function runAI() {
+          if (!appRunning) return;
+          if (video.readyState >= 2 && !isProcessing) {
+            isProcessing = true;
+            try {
+              frameCount++;
+              await hands.send({ image: video });
+              if (frameCount % 2 === 0) {
+                await faceMesh.send({ image: video });
+              }
+            } catch (e) {
+              console.warn('Inference error:', e);
+            }
+            isProcessing = false;
+          }
+          requestAnimationFrame(runAI);
+        }
+
+        runAI();
+        overlay.style.display = 'none';
+        render();
+
+        if (!tutorialShown) {
+          await showWelcomeAndTutorial();
+          tutorialShown = true;
+        }
+
+        btnStop.style.display = 'block';
+
+      } catch (err) {
+        console.error(err);
+        btnStart.disabled = false;
+        statusText.innerHTML = `<span style="color: #ff3366;">Error: ${err.message}</span>`;
+      }
+    }
+
+    function stopApp() {
+      appRunning = false;
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+      }
+      video.srcObject = null;
+      latestHandResults = null;
+      latestFaceResults = null;
+      handState.forEach(s => { s.smoothBloom = 0; s.smoothGrow = 0; });
+      smoothSmile = 0;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      btnStop.style.display = 'none';
+      overlay.style.display = 'block';
+      btnStart.disabled = false;
+      statusText.innerText = "Click to start tracking";
+    }
+
+    window.addEventListener('beforeunload', () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+    });
+  </script>
+</body>
+</html>
