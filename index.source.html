@@ -704,11 +704,11 @@
       ctx.save();
       ctx.translate(x, y);
 
-      const swayAmp = 0.08 * (1 + windSwayFactor * 2.8);
-      const globalWind = windSwayFactor * Math.sin(time * 0.002) * 0.25;
+      const swayAmp = 0.08 + windSwayFactor * 0.45;
+      const globalWind = Math.sin(time * 0.0035) * (0.12 + windSwayFactor * 0.38);
 
       for (let i = 0; i < numPetals; i++) {
-        const angle = (i * (Math.PI * 2)) / numPetals + Math.sin(time * 0.003 + i) * swayAmp + globalWind;
+        const angle = (i * (Math.PI * 2)) / numPetals + Math.sin(time * 0.005 + i * 0.8) * swayAmp + globalWind;
         const petalLen = baseRadius * 1.5;
         const petalWidth = baseRadius * (numPetals > 8 ? 0.35 : 0.55);
 
@@ -877,15 +877,15 @@
           const avgTipRatio = totalTipDist / FINGERTIPS.length;
           const isFist = avgTipRatio < CONFIG.fistTipRatioThreshold;
 
-          // Feature 2: Open Palm Hold Detection (Steady open palm held for > 750ms)
+          // Feature 2: Open Palm Hold Detection (Steady open palm held for > 400ms)
           const holdState = handHoldState[handIdx] || (handHoldState[handIdx] = { openStartTime: 0, prevPos: { x: 0, y: 0 } });
           const palmVel = dist(palmCenter, holdState.prevPos);
           holdState.prevPos = { x: palmCenter.x, y: palmCenter.y };
 
-          const isOpenPalm = !isFist && !isAirTapping && avgTipRatio > 1.45 && palmVel < 4.5;
+          const isOpenPalm = !isFist && !isAirTapping && avgTipRatio > 1.22 && palmVel < 16.0;
           if (isOpenPalm) {
             if (!holdState.openStartTime) holdState.openStartTime = time;
-            if (time - holdState.openStartTime > 750) {
+            if (time - holdState.openStartTime > 350) {
               targetWindSway = 1.0;
             }
           } else {
