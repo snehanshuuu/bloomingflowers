@@ -436,6 +436,7 @@
     ];
 
     let currentFlowerIdx = 0;
+    let cachedDockBtnEls = [];
 
     function renderFlowerDock() {
       const dock = document.getElementById('flower-dock');
@@ -452,6 +453,7 @@
         });
         dock.appendChild(btn);
       });
+      cachedDockBtnEls = Array.from(dock.querySelectorAll('.dock-btn'));
     }
 
     renderFlowerDock();
@@ -837,25 +839,30 @@
           });
         });
 
-        // Hit-test index finger tips against HTML flower dock buttons for hover and pinch air-tap
-        const dockBtns = document.querySelectorAll('.dock-btn');
+        // Hit-test index finger tips against top flower dock mathematically without DOM queries
+        const buttonWidth = 60;
+        const buttonHeight = 60;
+        const totalBarWidth = FLOWER_TYPES.length * (buttonWidth + 12);
+        const startX = (w - totalBarWidth) / 2;
+        const buttonY = 16;
+
         let anyHandHoveringDock = false;
 
         handData.forEach(h => {
           let isHandHovering = false;
-          dockBtns.forEach((btnEl, idx) => {
-            const rect = btnEl.getBoundingClientRect();
+          FLOWER_TYPES.forEach((_, idx) => {
+            const btnX = startX + idx * (buttonWidth + 12);
             const isHovered = (
-              h.indexTip.x >= rect.left &&
-              h.indexTip.x <= rect.right &&
-              h.indexTip.y >= rect.top &&
-              h.indexTip.y <= rect.bottom
+              h.indexTip.x >= btnX &&
+              h.indexTip.x <= btnX + buttonWidth &&
+              h.indexTip.y >= buttonY &&
+              h.indexTip.y <= buttonY + buttonHeight
             );
 
             if (isHovered) {
               isHandHovering = true;
               anyHandHoveringDock = true;
-              btnEl.classList.add('hovered');
+              if (cachedDockBtnEls[idx]) cachedDockBtnEls[idx].classList.add('hovered');
 
               if (h.isAirTapping && time - lastTapTime > CONFIG.airTapCooldownMs) {
                 currentFlowerIdx = idx;
@@ -870,8 +877,8 @@
           }
         });
 
-        if (!anyHandHoveringDock) {
-          dockBtns.forEach(btnEl => btnEl.classList.remove('hovered'));
+        if (!anyHandHoveringDock && cachedDockBtnEls.length > 0) {
+          cachedDockBtnEls.forEach(btnEl => btnEl.classList.remove('hovered'));
         }
 
         if (handData.length === 2) {
@@ -1168,7 +1175,7 @@
             try {
               frameCount++;
               await hands.send({ image: video });
-              if (frameCount % 2 === 0) {
+              if (frameCount % 3 === 0) {
                 await faceMesh.send({ image: video });
               }
             } catch (e) {
