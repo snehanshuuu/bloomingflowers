@@ -733,26 +733,50 @@
         }
       }
 
+      // Glassmorphic Top Dock container bar
+      const dockPadding = 12;
+      const dockX = startX - dockPadding;
+      const dockY = buttonY - dockPadding;
+      const dockWidth = totalBarWidth + dockPadding * 2 - 15;
+      const dockHeight = buttonHeight + dockPadding * 2;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(dockX, dockY, dockWidth, dockHeight, 18);
+      ctx.fillStyle = 'rgba(10, 12, 24, 0.65)';
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = '#00f0ff';
+      ctx.shadowBlur = 18;
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
       buttons.forEach((btn) => {
         const isSelected = btn.idx === currentFlowerIdx;
+        const scale = isSelected ? 1.08 : (btn.hovered ? 1.05 : 1.0);
 
         ctx.save();
+        ctx.translate(btn.x + btn.w / 2, btn.y + btn.h / 2);
+        ctx.scale(scale, scale);
+
         ctx.beginPath();
-        ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 14);
+        ctx.roundRect(-btn.w / 2, -btn.h / 2, btn.w, btn.h, 14);
 
         if (isSelected) {
-          ctx.fillStyle = 'rgba(0, 240, 255, 0.25)';
+          const pulseGlow = 16 + Math.sin(time * 0.005) * 6;
+          ctx.fillStyle = 'rgba(0, 240, 255, 0.3)';
           ctx.strokeStyle = '#00f0ff';
           ctx.shadowColor = '#00f0ff';
-          ctx.shadowBlur = 18;
+          ctx.shadowBlur = pulseGlow;
         } else if (btn.hovered) {
-          ctx.fillStyle = 'rgba(255, 43, 109, 0.25)';
+          ctx.fillStyle = 'rgba(255, 43, 109, 0.3)';
           ctx.strokeStyle = '#ff2b6d';
           ctx.shadowColor = '#ff2b6d';
-          ctx.shadowBlur = 12;
+          ctx.shadowBlur = 14;
         } else {
-          ctx.fillStyle = 'rgba(15, 15, 25, 0.75)';
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.fillStyle = 'rgba(20, 22, 38, 0.55)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
           ctx.shadowBlur = 0;
         }
 
@@ -760,10 +784,10 @@
         ctx.fill();
         ctx.stroke();
 
-        ctx.font = isSelected ? '30px "Courier New"' : '24px "Courier New"';
+        ctx.font = isSelected ? '32px "Courier New"' : '24px "Courier New"';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(btn.flower.emoji, btn.x + btn.w / 2, btn.y + btn.h / 2);
+        ctx.fillText(btn.flower.emoji, 0, 0);
         ctx.restore();
       });
 
