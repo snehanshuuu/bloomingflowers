@@ -251,6 +251,50 @@
     let smoothSmile = 0;
     let lastTapTime = 0;
     let smoothBouquet = 0;
+    let prevBouquetActive = false;
+
+    class Particle {
+      constructor(x, y, color, isBurst = false) {
+        this.x = x;
+        this.y = y;
+        const angle = isBurst ? Math.random() * Math.PI * 2 : -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
+        const speed = isBurst ? 1.5 + Math.random() * 4.0 : 0.4 + Math.random() * 1.5;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed - (isBurst ? 0 : 0.3);
+        this.size = (1.5 + Math.random() * 3.0) * (isBurst ? 1.4 : 1.0);
+        this.alpha = 1.0;
+        this.decay = isBurst ? 0.012 + Math.random() * 0.015 : 0.008 + Math.random() * 0.015;
+        this.color = color || '#00f0ff';
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy -= 0.012;
+        this.vx *= 0.98;
+        this.alpha -= this.decay;
+      }
+      draw(c) {
+        if (this.alpha <= 0) return;
+        c.save();
+        c.globalAlpha = Math.max(0, this.alpha);
+        c.beginPath();
+        c.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        c.fillStyle = this.color;
+        c.shadowColor = this.color;
+        c.shadowBlur = 10;
+        c.fill();
+        c.restore();
+      }
+    }
+
+    const particles = [];
+
+    function spawnParticles(x, y, color, count = 1, isBurst = false) {
+      if (particles.length > 300) return;
+      for (let i = 0; i < count; i++) {
+        particles.push(new Particle(x, y, color, isBurst));
+      }
+    }
 
     const handState = [
       { smoothBloom: 0, smoothGrow: 0 },
@@ -315,6 +359,10 @@
     function drawFlower(x, y, maxRadius, bloomProgress, flowerConfig, time) {
       if (bloomProgress <= 0.05) return;
 
+      if (Math.random() < 0.25) {
+        spawnParticles(x, y, flowerConfig.glow, 1, false);
+      }
+
       const numPetals = flowerConfig.petals;
       const baseRadius = maxRadius * bloomProgress;
 
@@ -375,6 +423,15 @@
       } else {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, w, h);
+      }
+
+      // Update & render active particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw(ctx);
+        if (particles[i].alpha <= 0) {
+          particles.splice(i, 1);
+        }
       }
 
       if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
@@ -527,6 +584,15 @@
             y: (handData[0].palmCenter.y + handData[1].palmCenter.y) / 2
           };
           const avgPalmHeight = (handData[0].palmHeight + handData[1].palmHeight) / 2;
+
+          // Trigger stardust particle burst on Bouquet Mode activation
+          if (smoothBouquet > 0.3 && !prevBouquetActive) {
+            prevBouquetActive = true;
+            spawnParticles(centralPoint.x, centralPoint.y, '#ffd700', 30, true);
+            spawnParticles(centralPoint.x, centralPoint.y, activeFlower.glow, 15, true);
+          } else if (smoothBouquet <= 0.1) {
+            prevBouquetActive = false;
+          }
 
           // Render ribbon wrap at central holding point
           drawNeonRibbon(centralPoint.x, centralPoint.y, avgPalmHeight * 0.45 * smoothBouquet, time);
