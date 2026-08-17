@@ -620,6 +620,13 @@
       { lastPinchTime: 0, isPinching: false }
     ];
 
+    // Feature 2: Open Palm Hold & Wind Sway Data
+    let smoothWindSway = 0;
+    const handHoldState = [
+      { openStartTime: 0, prevPos: { x: 0, y: 0 } },
+      { openStartTime: 0, prevPos: { x: 0, y: 0 } }
+    ];
+
     const handState = [
       { smoothBloom: 0, smoothGrow: 0, wasBlooming: false },
       { smoothBloom: 0, smoothGrow: 0, wasBlooming: false }
@@ -684,7 +691,7 @@
       ctx.restore();
     }
 
-    function drawFlower(x, y, maxRadius, bloomProgress, flowerConfig, time) {
+    function drawFlower(x, y, maxRadius, bloomProgress, flowerConfig, time, windSwayFactor = 0) {
       if (bloomProgress <= 0.05) return;
 
       if (Math.random() < 0.25) {
@@ -697,8 +704,11 @@
       ctx.save();
       ctx.translate(x, y);
 
+      const swayAmp = 0.08 * (1 + windSwayFactor * 2.8);
+      const globalWind = windSwayFactor * Math.sin(time * 0.002) * 0.25;
+
       for (let i = 0; i < numPetals; i++) {
-        const angle = (i * (Math.PI * 2)) / numPetals + Math.sin(time * 0.003 + i) * 0.08;
+        const angle = (i * (Math.PI * 2)) / numPetals + Math.sin(time * 0.003 + i) * swayAmp + globalWind;
         const petalLen = baseRadius * 1.5;
         const petalWidth = baseRadius * (numPetals > 8 ? 0.35 : 0.55);
 
@@ -790,7 +800,7 @@
 
         if (seed.sprouted) {
           if (seed.bloomProgress < 1.0) seed.bloomProgress += 0.035;
-          drawFlower(seed.landX, seed.landY, 22, seed.bloomProgress, seed.flower, time);
+          drawFlower(seed.landX, seed.landY, 22, seed.bloomProgress, seed.flower, time, smoothWindSway);
           if (age > 7500) {
             seedParticles.splice(i, 1);
           }
@@ -812,6 +822,7 @@
         smoothSmile += (0 - smoothSmile) * CONFIG.smileSmoothingRate;
       }
 
+      let targetWindSway = 0;
       let targetBouquet = 0;
       let handData = [];
 
@@ -865,6 +876,21 @@
           });
           const avgTipRatio = totalTipDist / FINGERTIPS.length;
           const isFist = avgTipRatio < CONFIG.fistTipRatioThreshold;
+
+          // Feature 2: Open Palm Hold Detection (Steady open palm held for > 750ms)
+          const holdState = handHoldState[handIdx] || (handHoldState[handIdx] = { openStartTime: 0, prevPos: { x: 0, y: 0 } });
+          const palmVel = dist(palmCenter, holdState.prevPos);
+          holdState.prevPos = { x: palmCenter.x, y: palmCenter.y };
+
+          const isOpenPalm = !isFist && !isAirTapping && avgTipRatio > 1.45 && palmVel < 4.5;
+          if (isOpenPalm) {
+            if (!holdState.openStartTime) holdState.openStartTime = time;
+            if (time - holdState.openStartTime > 750) {
+              targetWindSway = 1.0;
+            }
+          } else {
+            holdState.openStartTime = 0;
+          }
 
           let targetBloom = 0;
           let targetGrow = 0;
@@ -987,13 +1013,17 @@
       }
 
       smoothBouquet += (targetBouquet - smoothBouquet) * CONFIG.smoothingRate;
+      smoothWindSway += (targetWindSway - smoothWindSway) * 0.06;
 
       const activeFlower = FLOWER_TYPES[currentFlowerIdx];
 
       // Update Feedback Pill UI
       if (appRunning && feedbackPill && feedbackText) {
         feedbackPill.style.display = 'flex';
-        if (handData.length === 2) {
+        if (smoothWindSway > 0.4) {
+          feedbackIcon.innerText = '💨';
+          feedbackText.innerText = 'Open Palm Hold • Wind Sway Active 🍃';
+        } else if (handData.length === 2) {
           feedbackIcon.innerText = '🫶';
           feedbackText.innerText = smoothBouquet > 0.3 ? 'Bouquet Mode Active 💐' : '2 Hands Detected • Form Heart';
         } else if (handData.length === 1) {
@@ -1099,7 +1129,7 @@
             }
 
             if (currentBloom > 0.05) {
-              drawFlower(targetX, targetY, flowerMaxSize, currentBloom, activeFlower, time);
+              drawFlower(targetX, targetY, flowerMaxSize, currentBloom, activeFlower, time, smoothWindSway);
             }
           });
 
@@ -1153,7 +1183,7 @@
                 const currentHeadX = h.wrist.x + (tip.x - h.wrist.x) * h.state.smoothGrow;
                 const currentHeadY = h.wrist.y + (tip.y - h.wrist.y) * h.state.smoothGrow;
 
-                drawFlower(currentHeadX, currentHeadY, flowerMaxSize, h.state.smoothBloom, activeFlower, time);
+                drawFlower(currentHeadX, currentHeadY, flowerMaxSize, h.state.smoothBloom, activeFlower, time, smoothWindSway);
               });
             }
 
