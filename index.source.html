@@ -3,34 +3,58 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cyber Bloom Hand & Smile Tracking</title>
+  <title>Cyber Bloom — Gesture-Driven Botanical Garden</title>
+
+  <!-- Google Fonts: Space Grotesk & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
   <style>
+    :root {
+      --bg-void: #080910;
+      --cyan-neon: #00f0ff;
+      --pink-hot: #ff2b6d;
+      --solar-gold: #ffd700;
+      --glass-bg: rgba(14, 17, 30, 0.78);
+      --glass-border: rgba(0, 240, 255, 0.35);
+      --font-display: 'Space Grotesk', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
     }
+
     body {
-      background: #000;
+      background: var(--bg-void);
       width: 100vw;
       height: 100vh;
       overflow: hidden;
       display: flex;
       justify-content: center;
       align-items: center;
-      font-family: 'Courier New', Courier, monospace;
+      font-family: var(--font-mono);
+      color: #fff;
     }
+
     #stage {
       position: relative;
       width: 100vw;
       height: 100vh;
     }
+
     #canvas {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
     }
+
     #webcam {
       position: absolute;
       top: -9999px;
@@ -38,101 +62,295 @@
       opacity: 0;
       pointer-events: none;
     }
-    #overlay {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #00f0ff;
-      text-align: center;
-      padding: 24px;
-      background: rgba(10, 10, 15, 0.95);
-      border: 1px solid rgba(0, 240, 255, 0.4);
-      border-radius: 8px;
-      z-index: 100;
-      max-width: 320px;
-    }
-    #btn-start {
-      margin-top: 15px;
-      padding: 12px 24px;
-      background: #ff2b6d;
-      border: none;
-      color: #fff;
-      font-weight: bold;
-      font-size: 1rem;
-      border-radius: 4px;
-      font-family: inherit;
-      cursor: pointer;
-    }
-    #btn-start:hover {
-      background: #ff5588;
-    }
-    #btn-start:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    #btn-stop {
-      margin-top: 10px;
-      padding: 8px 18px;
-      background: transparent;
-      border: 1px solid rgba(0, 240, 255, 0.5);
-      color: #00f0ff;
-      font-size: 0.85rem;
-      border-radius: 4px;
-      font-family: inherit;
-      cursor: pointer;
+
+    /* UNIFIED RESPONSIVE HEADER BAR */
+    #app-header {
       position: absolute;
       top: 16px;
+      left: 16px;
       right: 16px;
-      z-index: 100;
-      display: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 120;
+      pointer-events: none;
     }
-    #tutorial-overlay {
+
+    #app-header > * {
+      pointer-events: auto;
+    }
+
+    /* GLASSMORPHIC FLOWER SELECTION DOCK */
+    .glass-dock {
+      display: flex;
+      gap: clamp(6px, 1.8vw, 14px);
+      padding: 8px 14px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    .dock-btn {
+      width: clamp(46px, 9vw, 64px);
+      height: clamp(46px, 9vw, 64px);
+      border-radius: 14px;
+      background: rgba(20, 24, 40, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .dock-btn:hover {
+      background: rgba(255, 43, 109, 0.25);
+      border-color: var(--pink-hot);
+      box-shadow: 0 0 14px rgba(255, 43, 109, 0.5);
+      transform: translateY(-2px) scale(1.05);
+    }
+
+    .dock-btn.active {
+      background: rgba(0, 240, 255, 0.25);
+      border-color: var(--cyan-neon);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+      transform: scale(1.08);
+      animation: pulseGlow 2.5s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 14px rgba(0, 240, 255, 0.5); }
+      100% { box-shadow: 0 0 26px rgba(0, 240, 255, 0.9); }
+    }
+
+    .dock-emoji {
+      font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+      line-height: 1;
+    }
+
+    .dock-label {
+      font-size: clamp(0.5rem, 0.9vw, 0.68rem);
+      font-family: var(--font-mono);
+      color: rgba(255, 255, 255, 0.8);
+      margin-top: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* CONTROL BUTTONS */
+    .cyber-btn-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      color: var(--cyan-neon);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      transition: all 0.25s ease;
+    }
+
+    .cyber-btn-icon:hover {
+      background: rgba(0, 240, 255, 0.25);
+      border-color: var(--cyan-neon);
+      box-shadow: 0 0 16px var(--cyan-neon);
+      transform: scale(1.1);
+    }
+
+    .cyber-btn-stop {
+      padding: 10px 18px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 43, 109, 0.5);
+      color: var(--pink-hot);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: 12px;
+      cursor: pointer;
+      display: none;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .cyber-btn-stop:hover {
+      background: rgba(255, 43, 109, 0.25);
+      border-color: var(--pink-hot);
+      box-shadow: 0 0 16px var(--pink-hot);
+    }
+
+    /* START & OVERLAY MODALS */
+    #overlay, #tutorial-overlay {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      color: #00f0ff;
+      z-index: 150;
+      width: calc(100% - 32px);
+      max-width: 420px;
+    }
+
+    .glass-card {
+      background: rgba(10, 12, 22, 0.92);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 32px 28px;
       text-align: center;
-      padding: 28px 24px;
-      background: rgba(10, 10, 15, 0.95);
-      border: 1px solid rgba(0, 240, 255, 0.4);
-      border-radius: 8px;
-      z-index: 110;
-      max-width: 340px;
-      display: none;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 240, 255, 0.15);
+      animation: cardAppear 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .tutorial-title {
-      font-size: 1.1rem;
-      font-weight: bold;
+
+    @keyframes cardAppear {
+      from { opacity: 0; transform: scale(0.92) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .cyber-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: rgba(0, 240, 255, 0.12);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      border-radius: 20px;
+      color: var(--cyan-neon);
+      font-size: 0.72rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 2.1rem;
+      font-weight: 700;
       color: #fff;
-      line-height: 1.5;
-      margin-bottom: 18px;
+      margin-bottom: 6px;
+      letter-spacing: -0.5px;
+      text-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
     }
+
+    .brand-subtitle {
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.65);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    /* CYBER SPINNER LOADER */
+    .spinner-box {
+      margin: 20px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .cyber-spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid rgba(0, 240, 255, 0.15);
+      border-top-color: var(--cyan-neon);
+      border-right-color: var(--pink-hot);
+      border-radius: 50%;
+      animation: cyberSpin 0.9s linear infinite;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+    }
+
+    @keyframes cyberSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    .status-text {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: var(--cyan-neon);
+      letter-spacing: 0.5px;
+    }
+
+    .cyber-btn-primary {
+      margin-top: 10px;
+      width: 100%;
+      padding: 14px 28px;
+      background: linear-gradient(135deg, var(--pink-hot), #d6004c);
+      border: none;
+      color: #fff;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.05rem;
+      border-radius: 14px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(255, 43, 109, 0.4);
+      transition: all 0.25s ease;
+    }
+
+    .cyber-btn-primary:hover {
+      background: linear-gradient(135deg, #ff5588, #ff2b6d);
+      box-shadow: 0 0 25px rgba(255, 43, 109, 0.7);
+      transform: translateY(-2px);
+    }
+
+    .cyber-btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* TUTORIAL MODAL */
     .tutorial-list {
       list-style: none;
       text-align: left;
-      color: #00f0ff;
-      font-size: 0.9rem;
-      line-height: 1.7;
-      margin-bottom: 20px;
+      margin: 18px 0 24px 0;
+      font-size: 0.88rem;
+      line-height: 1.8;
+      color: rgba(255, 255, 255, 0.9);
     }
+
     .tutorial-list li {
-      margin-bottom: 8px;
+      margin-bottom: 10px;
+      padding-left: 8px;
+      border-left: 2px solid var(--cyan-neon);
     }
-    .tutorial-btn {
-      padding: 12px 24px;
-      background: #ff2b6d;
-      border: none;
-      color: #fff;
-      font-weight: bold;
-      font-size: 1rem;
-      border-radius: 4px;
-      font-family: inherit;
-      cursor: pointer;
+
+    /* FEEDBACK LIVE PILL AT BOTTOM */
+    #feedback-pill {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 120;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 18px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--glass-border);
+      border-radius: 30px;
+      font-size: 0.82rem;
+      color: var(--cyan-neon);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+      transition: all 0.3s ease;
     }
-    .tutorial-btn:hover {
-      background: #ff5588;
+
+    #feedback-icon {
+      font-size: 1.1rem;
     }
   </style>
 
@@ -142,14 +360,44 @@
 </head>
 <body>
   <div id="stage">
-    <div id="overlay">
-      <p id="status-text">Click to start tracking</p>
-      <button id="btn-start" onclick="initApp()">Start Webcam</button>
-    </div>
-    <button id="btn-stop" onclick="stopApp()">Stop Camera</button>
+    <!-- HEADER BAR -->
+    <header id="app-header">
+      <button id="btn-help" class="cyber-btn-icon" title="Gesture Guide">?</button>
 
-    <div id="tutorial-overlay">
-      <div id="tutorial-content"></div>
+      <div id="flower-dock" class="glass-dock">
+        <!-- Dynamic Flower Selection Buttons -->
+      </div>
+
+      <button id="btn-stop" class="cyber-btn-stop">Stop Camera</button>
+    </header>
+
+    <!-- START OVERLAY -->
+    <div id="overlay">
+      <div class="glass-card">
+        <span class="cyber-badge">Digital Garden v2.0</span>
+        <h1 class="brand-title">CYBER BLOOM</h1>
+        <p class="brand-subtitle">Interactive Holographic Hand & Smile Vision Experience</p>
+
+        <div id="spinner-box" class="spinner-box" style="display: none;">
+          <div class="cyber-spinner"></div>
+          <p id="status-text" class="status-text">Accessing camera...</p>
+        </div>
+
+        <button id="btn-start" class="cyber-btn-primary">Start Webcam</button>
+      </div>
+    </div>
+
+    <!-- TUTORIAL OVERLAY -->
+    <div id="tutorial-overlay" style="display: none;">
+      <div class="glass-card">
+        <div id="tutorial-content"></div>
+      </div>
+    </div>
+
+    <!-- LIVE GESTURE FEEDBACK PILL -->
+    <div id="feedback-pill" style="display: none;">
+      <span id="feedback-icon">✋</span>
+      <span id="feedback-text">Scanning for hands...</span>
     </div>
 
     <video id="webcam" playsinline autoplay muted></video>
@@ -162,26 +410,63 @@
     const ctx = canvas.getContext('2d');
     const overlay = document.getElementById('overlay');
     const statusText = document.getElementById('status-text');
+    const spinnerBox = document.getElementById('spinner-box');
     const btnStart = document.getElementById('btn-start');
     const btnStop = document.getElementById('btn-stop');
+    const btnHelp = document.getElementById('btn-help');
     const tutorialOverlay = document.getElementById('tutorial-overlay');
     const tutorialContent = document.getElementById('tutorial-content');
+    const feedbackPill = document.getElementById('feedback-pill');
+    const feedbackIcon = document.getElementById('feedback-icon');
+    const feedbackText = document.getElementById('feedback-text');
 
     let tutorialShown = false;
+
+    const FLOWER_TYPES = [
+      { name: 'Rose', emoji: '🌹', petals: 6, primaryColor: 'rgba(255, 30, 80, 0.95)', midColor: 'rgba(255, 70, 120, 0.7)', glow: '#ff1e50', pistil: '#fff4f8' },
+      { name: 'Lotus', emoji: '🪷', petals: 8, primaryColor: 'rgba(255, 100, 200, 0.95)', midColor: 'rgba(200, 50, 255, 0.7)', glow: '#ff64c8', pistil: '#ffeb3b' },
+      { name: 'Daisy', emoji: '🌼', petals: 12, primaryColor: 'rgba(255, 255, 255, 0.95)', midColor: 'rgba(255, 230, 150, 0.7)', glow: '#ffe600', pistil: '#ffaa00' },
+      { name: 'Sakura', emoji: '🌸', petals: 5, primaryColor: 'rgba(255, 170, 200, 0.95)', midColor: 'rgba(255, 120, 160, 0.7)', glow: '#ffaac8', pistil: '#ffffff' }
+    ];
+
+    let currentFlowerIdx = 0;
+
+    function renderFlowerDock() {
+      const dock = document.getElementById('flower-dock');
+      if (!dock) return;
+      dock.innerHTML = '';
+      FLOWER_TYPES.forEach((flower, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `dock-btn ${idx === currentFlowerIdx ? 'active' : ''}`;
+        btn.innerHTML = `<span class="dock-emoji">${flower.emoji}</span><span class="dock-label">${flower.name}</span>`;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          currentFlowerIdx = idx;
+          renderFlowerDock();
+        });
+        dock.appendChild(btn);
+      });
+    }
+
+    renderFlowerDock();
 
     function showWelcomeAndTutorial() {
       return new Promise((resolve) => {
         const screens = [
-          `<p class="tutorial-title">🌸 Snehanshu presents you some Flowers 🌸</p>
-           <button class="tutorial-btn" id="tutorial-next">Continue</button>`,
-          `<p class="tutorial-title">How it works</p>
+          `<span class="cyber-badge">Welcome</span>
+           <h2 class="brand-title" style="font-size:1.6rem;">🌸 Snehanshu Presents 🌸</h2>
+           <p class="brand-subtitle">A Gesture-Driven Digital Garden Experience</p>
+           <button class="cyber-btn-primary" id="tutorial-next">Continue</button>`,
+          `<span class="cyber-badge">Gesture Guide</span>
+           <h2 class="brand-title" style="font-size:1.5rem;">How It Works</h2>
            <ul class="tutorial-list">
-             <li>🤏 Pinch your thumb and index finger together to bloom flowers from your fingertips</li>
+             <li>🤏 Pinch thumb & index finger to bloom flowers</li>
+             <li>🫶 Form a Heart with your hands (or cross wrists) for Bouquet Mode</li>
              <li>✊ Make a fist to close the flowers</li>
-             <li>👉 Point at an icon in the top bar and pinch to switch the flower type</li>
-             <li>😊 Smile at the camera for a little surprise</li>
+             <li>👉 Point at top dock or click directly to switch flower type</li>
+             <li>😊 Smile at camera for a little surprise</li>
            </ul>
-           <button class="tutorial-btn" id="tutorial-start">Start Blooming</button>`
+           <button class="cyber-btn-primary" id="tutorial-start">Start Blooming</button>`
         ];
 
         let idx = 0;
@@ -202,6 +487,12 @@
 
         tutorialOverlay.style.display = 'block';
         paint();
+      });
+    }
+
+    if (btnHelp) {
+      btnHelp.addEventListener('click', () => {
+        showWelcomeAndTutorial();
       });
     }
 
@@ -238,16 +529,6 @@
       airTapCooldownMs: 400
     };
 
-    const FLOWER_TYPES = [
-      { name: 'Rose', emoji: '🌹', petals: 6, primaryColor: 'rgba(255, 30, 80, 0.95)', midColor: 'rgba(255, 70, 120, 0.7)', glow: '#ff1e50', pistil: '#fff4f8' },
-      { name: 'Lotus', emoji: '🪷', petals: 8, primaryColor: 'rgba(255, 100, 200, 0.95)', midColor: 'rgba(200, 50, 255, 0.7)', glow: '#ff64c8', pistil: '#ffeb3b' },
-      { name: 'Daisy', emoji: '🌼', petals: 12, primaryColor: 'rgba(255, 255, 255, 0.95)', midColor: 'rgba(255, 230, 150, 0.7)', glow: '#ffe600', pistil: '#ffaa00' },
-      { name: 'Sakura', emoji: '🌸', petals: 5, primaryColor: 'rgba(255, 170, 200, 0.95)', midColor: 'rgba(255, 120, 160, 0.7)', glow: '#ffaac8', pistil: '#ffffff' }
-    ];
-
-
-
-      let currentFlowerIdx = 0;
     let smoothSmile = 0;
     let lastTapTime = 0;
     let smoothBouquet = 0;
@@ -322,7 +603,6 @@
       ctx.save();
       ctx.translate(x, y);
 
-      // Ribbon ring glow
       ctx.beginPath();
       ctx.arc(0, 0, Math.max(8, radius), 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(255, 43, 109, 0.9)';
@@ -331,7 +611,6 @@
       ctx.shadowBlur = 20;
       ctx.stroke();
 
-      // Inner cyan accent ring
       const pulse = Math.sin(time * 0.006) * 3;
       ctx.beginPath();
       ctx.arc(0, 0, Math.max(4, radius * 0.65 + pulse), 0, Math.PI * 2);
@@ -341,7 +620,6 @@
       ctx.shadowBlur = 15;
       ctx.stroke();
 
-      // Decorative ribbon loops / bow
       ctx.beginPath();
       ctx.ellipse(-radius * 0.7, radius * 0.35, radius * 0.65, radius * 0.3, -Math.PI / 4, 0, Math.PI * 2);
       ctx.ellipse(radius * 0.7, radius * 0.35, radius * 0.65, radius * 0.3, Math.PI / 4, 0, Math.PI * 2);
@@ -352,6 +630,13 @@
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(6, radius * 0.3), 0, Math.PI * 2);
+      ctx.fillStyle = '#ff2b6d';
+      ctx.shadowColor = '#ff2b6d';
+      ctx.shadowBlur = 18;
+      ctx.fill();
 
       ctx.restore();
     }
@@ -421,11 +706,10 @@
         ctx.drawImage(video, 0, 0, w, h);
         ctx.restore();
       } else {
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = '#080910';
         ctx.fillRect(0, 0, w, h);
       }
 
-      // Update & render active particles
       for (let i = particles.length - 1; i >= 0; i--) {
         particles[i].update();
         particles[i].draw(ctx);
@@ -449,22 +733,6 @@
         smoothSmile += (0 - smoothSmile) * CONFIG.smileSmoothingRate;
       }
 
-      const buttonWidth = 70;
-      const buttonHeight = 70;
-      const buttonY = 50;
-      const totalBarWidth = FLOWER_TYPES.length * (buttonWidth + 15);
-      const startX = (w - totalBarWidth) / 2;
-
-      const buttons = FLOWER_TYPES.map((flower, idx) => ({
-        idx,
-        flower,
-        x: startX + idx * (buttonWidth + 15),
-        y: buttonY,
-        w: buttonWidth,
-        h: buttonHeight,
-        hovered: false
-      }));
-
       let targetBouquet = 0;
       let handData = [];
 
@@ -484,27 +752,6 @@
           const pinchDist = dist(thumbTip, indexTip);
           const isAirTapping = pinchDist < palmHeight * CONFIG.airTapPinchFactor;
 
-          let isHoveringTopBar = false;
-
-          buttons.forEach((btn) => {
-            const isHovered = (
-              indexTip.x >= btn.x &&
-              indexTip.x <= btn.x + btn.w &&
-              indexTip.y >= btn.y &&
-              indexTip.y <= btn.y + btn.h
-            );
-
-            if (isHovered) {
-              isHoveringTopBar = true;
-              btn.hovered = true;
-
-              if (isAirTapping && time - lastTapTime > CONFIG.airTapCooldownMs) {
-                currentFlowerIdx = btn.idx;
-                lastTapTime = time;
-              }
-            }
-          });
-
           let totalTipDist = 0;
           FINGERTIPS.forEach(tipIdx => {
             totalTipDist += dist(wrist, pts[tipIdx]) / palmHeight;
@@ -515,7 +762,7 @@
           let targetBloom = 0;
           let targetGrow = 0;
 
-          if (!isFist && !isHoveringTopBar) {
+          if (!isFist) {
             const pinchRatio = pinchDist / palmHeight;
             targetBloom = (pinchRatio - CONFIG.pinchRatioMin) / (CONFIG.pinchRatioMax - CONFIG.pinchRatioMin);
             targetBloom = Math.max(0, Math.min(1, targetBloom));
@@ -540,12 +787,25 @@
         });
 
         if (handData.length === 2) {
-          const avgPalmHeight = (handData[0].palmHeight + handData[1].palmHeight) / 2;
-          const palmDist = dist(handData[0].palmCenter, handData[1].palmCenter);
-          const proxThreshold = avgPalmHeight * 1.6;
+          const h0 = handData[0];
+          const h1 = handData[1];
+          const thumbDist = dist(h0.pts[4], h1.pts[4]);
+          const indexDist = dist(h0.pts[8], h1.pts[8]);
+          const wristDist = dist(h0.wrist, h1.wrist);
+          const avgPalmHeight = (h0.palmHeight + h1.palmHeight) / 2;
 
-          if (palmDist < proxThreshold) {
-            targetBouquet = Math.max(0, Math.min(1, (proxThreshold - palmDist) / (proxThreshold * 0.45)));
+          const isHeartHands = (thumbDist < 100 || thumbDist < avgPalmHeight * 1.1) &&
+                               (indexDist < 100 || indexDist < avgPalmHeight * 1.1);
+          const isCrossedWrists = wristDist < 120 || wristDist < avgPalmHeight * 1.3;
+
+          if (isHeartHands || isCrossedWrists) {
+            targetBouquet = 1.0;
+          } else {
+            const heartProx = Math.min(thumbDist + indexDist, wristDist * 1.5);
+            const maxThresh = Math.max(220, avgPalmHeight * 2.5);
+            if (heartProx < maxThresh) {
+              targetBouquet = Math.max(0, Math.min(1, (maxThresh - heartProx) / (maxThresh * 0.6)));
+            }
           }
         }
 
@@ -564,6 +824,22 @@
 
       const activeFlower = FLOWER_TYPES[currentFlowerIdx];
 
+      // Update Feedback Pill UI
+      if (appRunning && feedbackPill && feedbackText) {
+        feedbackPill.style.display = 'flex';
+        if (handData.length === 2) {
+          feedbackIcon.innerText = '🫶';
+          feedbackText.innerText = smoothBouquet > 0.3 ? 'Bouquet Mode Active 💐' : '2 Hands Detected • Form Heart';
+        } else if (handData.length === 1) {
+          const bloomPct = Math.round(handData[0].state.smoothBloom * 100);
+          feedbackIcon.innerText = '🤏';
+          feedbackText.innerText = `Hand 1 Active • Bloom ${bloomPct}%`;
+        } else {
+          feedbackIcon.innerText = '✋';
+          feedbackText.innerText = 'Scanning for hands...';
+        }
+      }
+
       // Draw index finger air-tap cursors
       handData.forEach(h => {
         ctx.save();
@@ -578,14 +854,12 @@
 
       if (handData.length > 0) {
         if (handData.length === 2 && smoothBouquet > 0.05) {
-          // --- TWO-HANDED BOUQUET MODE ---
           const centralPoint = {
             x: (handData[0].palmCenter.x + handData[1].palmCenter.x) / 2,
             y: (handData[0].palmCenter.y + handData[1].palmCenter.y) / 2
           };
           const avgPalmHeight = (handData[0].palmHeight + handData[1].palmHeight) / 2;
 
-          // Trigger stardust particle burst on Bouquet Mode activation
           if (smoothBouquet > 0.3 && !prevBouquetActive) {
             prevBouquetActive = true;
             spawnParticles(centralPoint.x, centralPoint.y, '#ffd700', 30, true);
@@ -594,10 +868,8 @@
             prevBouquetActive = false;
           }
 
-          // Render ribbon wrap at central holding point
           drawNeonRibbon(centralPoint.x, centralPoint.y, avgPalmHeight * 0.45 * smoothBouquet, time);
 
-          // Collect all 10 fingertips across both hands
           const allFingers = [];
           handData.forEach(h => {
             FINGERTIPS.forEach((tipIdx, fIdx) => {
@@ -613,11 +885,12 @@
             });
           });
 
-          // Sort fingertips left-to-right for clean arch distribution
           allFingers.sort((a, b) => a.tip.x - b.tip.x);
 
-          const avgGrow = (handData[0].state.smoothGrow + handData[1].state.smoothGrow) / 2;
-          const avgBloom = (handData[0].state.smoothBloom + handData[1].state.smoothBloom) / 2;
+          const maxGrow = Math.max(handData[0].state.smoothGrow, handData[1].state.smoothGrow, 0.75);
+          const maxBloom = Math.max(handData[0].state.smoothBloom, handData[1].state.smoothBloom, 0.85);
+          const avgGrow = maxGrow;
+          const avgBloom = maxBloom;
           const flowerMaxSize = avgPalmHeight * 0.5;
 
           allFingers.forEach((finger, i) => {
@@ -669,7 +942,7 @@
             ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, avgBloom * 1.3)})`;
             ctx.shadowColor = '#ff2b6d';
             ctx.shadowBlur = 22;
-            ctx.font = 'bold 28px "Courier New", monospace';
+            ctx.font = 'bold 28px "Space Grotesk", sans-serif';
             ctx.textAlign = 'center';
             const msg = smoothBouquet > 0.5 ? 'A bouquet for you 💐' : `For you ${activeFlower.emoji}`;
             ctx.fillText(msg, centralPoint.x, centralPoint.y + avgPalmHeight * 1.1);
@@ -677,7 +950,6 @@
           }
 
         } else {
-          // --- SINGLE-HAND INDEPENDENT MODE ---
           handData.forEach(h => {
             if (h.state.smoothGrow > 0.05) {
               ctx.save();
@@ -724,7 +996,7 @@
               ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, h.state.smoothBloom * 1.2)})`;
               ctx.shadowColor = activeFlower.glow;
               ctx.shadowBlur = 18;
-              ctx.font = 'bold 26px "Courier New", monospace';
+              ctx.font = 'bold 26px "Space Grotesk", sans-serif';
               ctx.textAlign = 'center';
               ctx.fillText(`For you ${activeFlower.emoji}`, h.palmCenter.x, h.wrist.y + 60);
               ctx.restore();
@@ -733,72 +1005,14 @@
         }
       }
 
-      // Glassmorphic Top Dock container bar
-      const dockPadding = 12;
-      const dockX = startX - dockPadding;
-      const dockY = buttonY - dockPadding;
-      const dockWidth = totalBarWidth + dockPadding * 2 - 15;
-      const dockHeight = buttonHeight + dockPadding * 2;
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(dockX, dockY, dockWidth, dockHeight, 18);
-      ctx.fillStyle = 'rgba(10, 12, 24, 0.65)';
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = '#00f0ff';
-      ctx.shadowBlur = 18;
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-
-      buttons.forEach((btn) => {
-        const isSelected = btn.idx === currentFlowerIdx;
-        const scale = isSelected ? 1.08 : (btn.hovered ? 1.05 : 1.0);
-
-        ctx.save();
-        ctx.translate(btn.x + btn.w / 2, btn.y + btn.h / 2);
-        ctx.scale(scale, scale);
-
-        ctx.beginPath();
-        ctx.roundRect(-btn.w / 2, -btn.h / 2, btn.w, btn.h, 14);
-
-        if (isSelected) {
-          const pulseGlow = 16 + Math.sin(time * 0.005) * 6;
-          ctx.fillStyle = 'rgba(0, 240, 255, 0.3)';
-          ctx.strokeStyle = '#00f0ff';
-          ctx.shadowColor = '#00f0ff';
-          ctx.shadowBlur = pulseGlow;
-        } else if (btn.hovered) {
-          ctx.fillStyle = 'rgba(255, 43, 109, 0.3)';
-          ctx.strokeStyle = '#ff2b6d';
-          ctx.shadowColor = '#ff2b6d';
-          ctx.shadowBlur = 14;
-        } else {
-          ctx.fillStyle = 'rgba(20, 22, 38, 0.55)';
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-          ctx.shadowBlur = 0;
-        }
-
-        ctx.lineWidth = isSelected || btn.hovered ? 2.5 : 1;
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.font = isSelected ? '32px "Courier New"' : '24px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(btn.flower.emoji, 0, 0);
-        ctx.restore();
-      });
-
       if (smoothSmile > 0.3) {
         ctx.save();
         ctx.fillStyle = `rgba(255, 225, 80, ${Math.min(1, smoothSmile * 1.5)})`;
         ctx.shadowColor = '#ffd700';
         ctx.shadowBlur = 24;
-        ctx.font = 'bold 30px "Courier New", monospace';
+        ctx.font = 'bold 30px "Space Grotesk", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('happy you smiled ✨', w / 2, h - 70);
+        ctx.fillText('happy you smiled ✨', w / 2, h - 80);
         ctx.restore();
       }
 
@@ -813,7 +1027,12 @@
     async function initApp() {
       try {
         btnStart.disabled = true;
-        statusText.innerText = "Accessing camera...";
+        if (spinnerBox) spinnerBox.style.display = 'flex';
+        statusText.innerText = "Accessing webcam...";
+
+        if (typeof navigator.mediaDevices === 'undefined' || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Webcam API not supported or blocked by browser security context.');
+        }
 
         if (typeof Hands === 'undefined' || typeof FaceMesh === 'undefined') {
           throw new Error('Tracking models failed to load from CDN. Check your connection or ad blocker and reload.');
@@ -828,7 +1047,7 @@
         video.srcObject = stream;
         await video.play();
 
-        statusText.innerText = "Loading AI models...";
+        statusText.innerText = "Loading AI Vision Models...";
 
         const hands = new Hands({
           locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
@@ -884,9 +1103,16 @@
         btnStop.style.display = 'block';
 
       } catch (err) {
-        console.error(err);
+        console.error('initApp Error:', err);
         btnStart.disabled = false;
-        statusText.innerHTML = `<span style="color: #ff3366;">Error: ${err.message}</span>`;
+        if (spinnerBox) spinnerBox.style.display = 'none';
+        if (err.name === 'NotAllowedError') {
+          statusText.innerHTML = `<span style="color: #ff3366;">Camera permission denied. Please allow camera access in browser settings.</span>`;
+        } else if (err.name === 'NotFoundError') {
+          statusText.innerHTML = `<span style="color: #ff3366;">No camera found. Please connect a webcam and retry.</span>`;
+        } else {
+          statusText.innerHTML = `<span style="color: #ff3366;">Error: ${err.message || err}</span>`;
+        }
       }
     }
 
@@ -904,13 +1130,22 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       btnStop.style.display = 'none';
+      if (feedbackPill) feedbackPill.style.display = 'none';
       overlay.style.display = 'block';
+      if (spinnerBox) spinnerBox.style.display = 'none';
       btnStart.disabled = false;
       statusText.innerText = "Click to start tracking";
     }
 
     window.initApp = initApp;
     window.stopApp = stopApp;
+
+    if (btnStart) {
+      btnStart.addEventListener('click', initApp);
+    }
+    if (btnStop) {
+      btnStop.addEventListener('click', stopApp);
+    }
 
     window.addEventListener('beforeunload', () => {
       if (mediaStream) {
