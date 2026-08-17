@@ -613,6 +613,13 @@
       }
     }
 
+    // Feature 1: Double Pinch Seeds & Sprouting Data
+    const seedParticles = [];
+    const handPinchHistory = [
+      { lastPinchTime: 0, isPinching: false },
+      { lastPinchTime: 0, isPinching: false }
+    ];
+
     const handState = [
       { smoothBloom: 0, smoothGrow: 0, wasBlooming: false },
       { smoothBloom: 0, smoothGrow: 0, wasBlooming: false }
@@ -754,6 +761,42 @@
         }
       }
 
+      // Feature 1: Seed Particles & Sprouted Delayed Flowers Render
+      for (let i = seedParticles.length - 1; i >= 0; i--) {
+        const seed = seedParticles[i];
+        const age = time - seed.spawnTime;
+
+        if (!seed.sprouted) {
+          seed.x += seed.vx;
+          seed.y += seed.vy;
+          seed.vy += 0.055;
+          seed.vx *= 0.98;
+
+          if (age >= seed.sproutDelay || seed.y >= seed.landY) {
+            seed.sprouted = true;
+            seed.landX = seed.x;
+            seed.landY = seed.y;
+          } else {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(seed.x, seed.y, 2.2, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffb703';
+            ctx.shadowColor = '#ffb703';
+            ctx.shadowBlur = 8;
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
+        if (seed.sprouted) {
+          if (seed.bloomProgress < 1.0) seed.bloomProgress += 0.035;
+          drawFlower(seed.landX, seed.landY, 22, seed.bloomProgress, seed.flower, time);
+          if (age > 7500) {
+            seedParticles.splice(i, 1);
+          }
+        }
+      }
+
       if (latestFaceResults && latestFaceResults.multiFaceLandmarks && latestFaceResults.multiFaceLandmarks.length > 0) {
         const facePts = latestFaceResults.multiFaceLandmarks[0].map(p => ({ x: (1 - p.x) * w, y: p.y * h }));
 
@@ -787,6 +830,34 @@
 
           const pinchDist = dist(thumbTip, indexTip);
           const isAirTapping = pinchDist < palmHeight * CONFIG.airTapPinchFactor;
+
+          // Feature 1: Double Pinch Detection (Rapid pinch-release-pinch within 600ms)
+          const pinchHist = handPinchHistory[handIdx] || (handPinchHistory[handIdx] = { lastPinchTime: 0, isPinching: false });
+          if (isAirTapping && !pinchHist.isPinching) {
+            const timeSinceLastPinch = time - pinchHist.lastPinchTime;
+            if (timeSinceLastPinch > 100 && timeSinceLastPinch < 600) {
+              const activeFlw = FLOWER_TYPES[currentFlowerIdx];
+              for (let s = 0; s < 7; s++) {
+                const angle = (Math.random() - 0.5) * Math.PI * 1.2 - Math.PI / 2;
+                const speed = 1.2 + Math.random() * 3.2;
+                seedParticles.push({
+                  x: indexTip.x,
+                  y: indexTip.y,
+                  vx: Math.cos(angle) * speed,
+                  vy: Math.sin(angle) * speed + 0.8,
+                  landX: indexTip.x + (Math.random() - 0.5) * 160,
+                  landY: Math.min(h - 90, indexTip.y + 100 + Math.random() * 140),
+                  spawnTime: time,
+                  sproutDelay: 850 + Math.random() * 350,
+                  sprouted: false,
+                  bloomProgress: 0,
+                  flower: activeFlw
+                });
+              }
+            }
+            pinchHist.lastPinchTime = time;
+          }
+          pinchHist.isPinching = isAirTapping;
 
           let totalTipDist = 0;
           FINGERTIPS.forEach(tipIdx => {
