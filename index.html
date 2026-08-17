@@ -110,7 +110,8 @@
       position: relative;
     }
 
-    .dock-btn:hover {
+    .dock-btn:hover,
+    .dock-btn.hovered {
       background: rgba(230, 57, 104, 0.25);
       border-color: var(--pink-hot);
       box-shadow: 0 0 14px rgba(230, 57, 104, 0.5);
@@ -790,6 +791,43 @@
             state
           });
         });
+
+        // Hit-test index finger tips against HTML flower dock buttons for hover and pinch air-tap
+        const dockBtns = document.querySelectorAll('.dock-btn');
+        let anyHandHoveringDock = false;
+
+        handData.forEach(h => {
+          let isHandHovering = false;
+          dockBtns.forEach((btnEl, idx) => {
+            const rect = btnEl.getBoundingClientRect();
+            const isHovered = (
+              h.indexTip.x >= rect.left &&
+              h.indexTip.x <= rect.right &&
+              h.indexTip.y >= rect.top &&
+              h.indexTip.y <= rect.bottom
+            );
+
+            if (isHovered) {
+              isHandHovering = true;
+              anyHandHoveringDock = true;
+              btnEl.classList.add('hovered');
+
+              if (h.isAirTapping && time - lastTapTime > CONFIG.airTapCooldownMs) {
+                currentFlowerIdx = idx;
+                lastTapTime = time;
+                renderFlowerDock();
+              }
+            }
+          });
+
+          if (isHandHovering) {
+            h.state.smoothBloom += (0 - h.state.smoothBloom) * CONFIG.smoothingRate;
+          }
+        });
+
+        if (!anyHandHoveringDock) {
+          dockBtns.forEach(btnEl => btnEl.classList.remove('hovered'));
+        }
 
         if (handData.length === 2) {
           const h0 = handData[0];
