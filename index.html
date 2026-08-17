@@ -620,8 +620,11 @@
       { lastPinchTime: 0, isPinching: false }
     ];
 
-    // Feature 2: Open Palm Hold & Wind Sway Data
+    // Feature 2: Open Palm Hold & Wind Sway & Hand Swipe Data
     let smoothWindSway = 0;
+    let smoothSwipeGust = 0;
+    let targetSwipeGust = 0;
+    let lastSwipeTime = 0;
     const handHoldState = [
       { openStartTime: 0, prevPos: { x: 0, y: 0 } },
       { openStartTime: 0, prevPos: { x: 0, y: 0 } }
@@ -877,9 +880,39 @@
           const avgTipRatio = totalTipDist / FINGERTIPS.length;
           const isFist = avgTipRatio < CONFIG.fistTipRatioThreshold;
 
-          // Feature 2: Open Palm Hold Detection (Steady open palm held for > 400ms)
+          // Feature 2: Open Palm Hold & Hand Swipe Gust Detection
           const holdState = handHoldState[handIdx] || (handHoldState[handIdx] = { openStartTime: 0, prevPos: { x: 0, y: 0 } });
+          const dx = palmCenter.x - holdState.prevPos.x;
+          const dy = palmCenter.y - holdState.prevPos.y;
           const palmVel = dist(palmCenter, holdState.prevPos);
+
+          // Fast hand swipe across screen triggers air blow-away gust!
+          if (palmVel > 28 && time - lastSwipeTime > 450) {
+            lastSwipeTime = time;
+            targetSwipeGust = 1.0;
+            const swipeAngle = Math.atan2(dy, dx);
+            const swipeSpeed = Math.min(22, palmVel * 0.45);
+            const activeFlw = FLOWER_TYPES[currentFlowerIdx];
+
+            for (let g = 0; g < 35; g++) {
+              const pX = palmCenter.x + (Math.random() - 0.5) * 140;
+              const pY = palmCenter.y + (Math.random() - 0.5) * 140;
+              const pAngle = swipeAngle + (Math.random() - 0.5) * 0.7;
+              const pSpeed = swipeSpeed * (0.8 + Math.random() * 0.9);
+              const p = new Particle(pX, pY, activeFlw.glow, false, true);
+              p.vx = Math.cos(pAngle) * pSpeed;
+              p.vy = Math.sin(pAngle) * pSpeed;
+              particles.push(p);
+            }
+
+            // Blow away all floating/sprouted seed particles in swipe direction!
+            seedParticles.forEach(seed => {
+              seed.vx += Math.cos(swipeAngle) * (12 + Math.random() * 8);
+              seed.vy += Math.sin(swipeAngle) * (12 + Math.random() * 8);
+              seed.sprouted = false; // blows away flowers into flying seeds
+            });
+          }
+
           holdState.prevPos = { x: palmCenter.x, y: palmCenter.y };
 
           const isOpenPalm = !isFist && !isAirTapping && avgTipRatio > 1.22 && palmVel < 16.0;
@@ -1014,13 +1047,18 @@
 
       smoothBouquet += (targetBouquet - smoothBouquet) * CONFIG.smoothingRate;
       smoothWindSway += (targetWindSway - smoothWindSway) * 0.06;
+      smoothSwipeGust += (targetSwipeGust - smoothSwipeGust) * 0.12;
+      targetSwipeGust *= 0.88;
 
       const activeFlower = FLOWER_TYPES[currentFlowerIdx];
 
       // Update Feedback Pill UI
       if (appRunning && feedbackPill && feedbackText) {
         feedbackPill.style.display = 'flex';
-        if (smoothWindSway > 0.4) {
+        if (smoothSwipeGust > 0.25) {
+          feedbackIcon.innerText = '🌪️';
+          feedbackText.innerText = 'Hand Swipe • Air Blows Flowers Away!';
+        } else if (smoothWindSway > 0.4) {
           feedbackIcon.innerText = '💨';
           feedbackText.innerText = 'Open Palm Hold • Wind Sway Active 🍃';
         } else if (handData.length === 2) {
