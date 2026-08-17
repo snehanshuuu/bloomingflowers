@@ -541,34 +541,62 @@
     let prevBouquetActive = false;
 
     class Particle {
-      constructor(x, y, color, isBurst = false) {
+      constructor(x, y, color, isBurst = false, isShatter = false) {
         this.x = x;
         this.y = y;
-        const angle = isBurst ? Math.random() * Math.PI * 2 : -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
-        const speed = isBurst ? 1.5 + Math.random() * 4.0 : 0.4 + Math.random() * 1.5;
-        this.vx = Math.cos(angle) * speed;
-        this.vy = Math.sin(angle) * speed - (isBurst ? 0 : 0.3);
-        this.size = (1.5 + Math.random() * 3.0) * (isBurst ? 1.4 : 1.0);
-        this.alpha = 1.0;
-        this.decay = isBurst ? 0.012 + Math.random() * 0.015 : 0.008 + Math.random() * 0.015;
+        this.isShatter = isShatter;
+
+        if (isShatter) {
+          const angle = (Math.random() - 0.5) * Math.PI * 1.5 - Math.PI / 2;
+          const speed = 0.8 + Math.random() * 2.8;
+          this.vx = Math.cos(angle) * speed;
+          this.vy = Math.sin(angle) * speed;
+          this.size = 2.0 + Math.random() * 3.2;
+          this.alpha = 1.0;
+          this.decay = 0.012 + Math.random() * 0.012;
+          this.rotation = Math.random() * Math.PI * 2;
+          this.rotSpeed = (Math.random() - 0.5) * 0.15;
+        } else {
+          const angle = isBurst ? Math.random() * Math.PI * 2 : -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
+          const speed = isBurst ? 1.5 + Math.random() * 4.0 : 0.4 + Math.random() * 1.5;
+          this.vx = Math.cos(angle) * speed;
+          this.vy = Math.sin(angle) * speed - (isBurst ? 0 : 0.3);
+          this.size = (1.5 + Math.random() * 3.0) * (isBurst ? 1.4 : 1.0);
+          this.alpha = 1.0;
+          this.decay = isBurst ? 0.012 + Math.random() * 0.015 : 0.008 + Math.random() * 0.015;
+        }
         this.color = color || '#2ee6a6';
       }
       update() {
         this.x += this.vx;
         this.y += this.vy;
-        this.vy -= 0.012;
-        this.vx *= 0.98;
+        if (this.isShatter) {
+          this.vy += 0.025;
+          this.vx *= 0.96;
+          this.rotation += this.rotSpeed;
+        } else {
+          this.vy -= 0.012;
+          this.vx *= 0.98;
+        }
         this.alpha -= this.decay;
       }
       draw(c) {
         if (this.alpha <= 0) return;
         c.save();
         c.globalAlpha = Math.max(0, this.alpha);
-        c.beginPath();
-        c.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        c.translate(this.x, this.y);
+
+        if (this.isShatter) {
+          c.rotate(this.rotation);
+          c.beginPath();
+          c.ellipse(0, 0, this.size * 1.4, this.size * 0.7, 0, 0, Math.PI * 2);
+        } else {
+          c.beginPath();
+          c.arc(0, 0, this.size, 0, Math.PI * 2);
+        }
         c.fillStyle = this.color;
         c.shadowColor = this.color;
-        c.shadowBlur = 10;
+        c.shadowBlur = this.isShatter ? 12 : 10;
         c.fill();
         c.restore();
       }
@@ -576,16 +604,16 @@
 
     const particles = [];
 
-    function spawnParticles(x, y, color, count = 1, isBurst = false) {
-      if (particles.length > 300) return;
+    function spawnParticles(x, y, color, count = 1, isBurst = false, isShatter = false) {
+      if (particles.length > 350) return;
       for (let i = 0; i < count; i++) {
-        particles.push(new Particle(x, y, color, isBurst));
+        particles.push(new Particle(x, y, color, isBurst, isShatter));
       }
     }
 
     const handState = [
-      { smoothBloom: 0, smoothGrow: 0 },
-      { smoothBloom: 0, smoothGrow: 0 }
+      { smoothBloom: 0, smoothGrow: 0, wasBlooming: false },
+      { smoothBloom: 0, smoothGrow: 0, wasBlooming: false }
     ];
 
     let latestHandResults = null;
@@ -744,7 +772,7 @@
 
       if (latestHandResults && latestHandResults.multiHandLandmarks && latestHandResults.multiHandLandmarks.length > 0) {
         latestHandResults.multiHandLandmarks.forEach((landmarks, handIdx) => {
-          const state = handState[handIdx] || (handState[handIdx] = { smoothBloom: 0, smoothGrow: 0 });
+          const state = handState[handIdx] || (handState[handIdx] = { smoothBloom: 0, smoothGrow: 0, wasBlooming: false });
 
           const pts = landmarks.map(p => ({ x: (1 - p.x) * w, y: p.y * h }));
           const wrist = pts[0];
@@ -768,7 +796,24 @@
           let targetBloom = 0;
           let targetGrow = 0;
 
-          if (!isFist) {
+          if (isFist) {
+            if (state.wasBlooming || state.smoothBloom > 0.3) {
+              state.wasBlooming = false;
+              const activeFlower = FLOWER_TYPES[currentFlowerIdx];
+              FINGERTIPS.forEach(tipIdx => {
+                const tip = pts[tipIdx];
+                spawnParticles(tip.x, tip.y, activeFlower.glow, 6, false, true);
+                spawnParticles(tip.x, tip.y, activeFlower.primaryColor, 5, false, true);
+              });
+              state.smoothBloom = 0;
+              state.smoothGrow = 0;
+              targetBloom = 0;
+              targetGrow = 0;
+            }
+          } else {
+            if (state.smoothBloom > 0.3) {
+              state.wasBlooming = true;
+            }
             const pinchRatio = pinchDist / palmHeight;
             targetBloom = (pinchRatio - CONFIG.pinchRatioMin) / (CONFIG.pinchRatioMax - CONFIG.pinchRatioMin);
             targetBloom = Math.max(0, Math.min(1, targetBloom));
